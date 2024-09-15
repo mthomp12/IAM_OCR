@@ -10,8 +10,8 @@ from utils.dataloader import OCRData, collate_fn
 
 wandb.init(project="IAM_OCR", entity="mthomp12", name=str(datetime.datetime.now()).partition(".")[0])
 
-config_encoder = ViTConfig(image_size=(128,4352))
-decoder = AutoModel.from_pretrained("FacebookAi/roberta-base")
+config_encoder = ViTConfig(image_size=(128,500), num_hidden_layers=1)
+decoder = AutoModel.from_pretrained("smallbenchnlp/roberta-small")
 config_decoder = decoder.config
 config = VisionEncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
 model = VisionEncoderDecoderModel(config=config)
@@ -32,9 +32,9 @@ model.decoder.load_state_dict(decoder_state_dict)
 
 training_arguments = TrainingArguments(
                                         output_dir="outputs",
-                                        per_device_train_batch_size=2,
+                                        per_device_train_batch_size=1,
                                         logging_steps=10,
-                                        bf16=True
+                                        bf16=False
                                         )
 tokenizer = AutoTokenizer.from_pretrained("FacebookAi/roberta-base")
 collator = functools.partial(collate_fn, tokenizer=tokenizer)

@@ -6,7 +6,7 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 class OCRData:
-    def __init__(self, root="IAM_OCR/data"):
+    def __init__(self, root="../data"):
         self.root = root
         meta_filepath=f"{self.root}/gt_test.txt"
         self.df = self.get_data(meta_filepath)
@@ -36,7 +36,7 @@ def collate_fn(x, tokenizer):
     # pad pixel_values to max width
     pixel_values = [xx.pop('pixel_values') for xx in x]
     pixel_values = [img.permute(2,0,1) for img in pixel_values] #h,w,c -> c,h,w
-    w = 4352
+    w = 500
     pixel_values = [F.pad(img, [0, w - img.size(2)]) for img in pixel_values]
     pixel_values = torch.stack(pixel_values)
 
