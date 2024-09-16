@@ -6,6 +6,16 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 class OCRData:
+    """
+    inputs:
+        root: directory containing gt_test.txt and image directory from https://www.kaggle.com/datasets/changheonkim/iam-trocr
+        eval: Boolean, set to False first 80% of data in gt_text, True for last 20%
+    Outputs:
+        dictionary containing:
+            pixel_values: Image resized to 128 x 1024 and normalized to 0,1
+            labels: target text, converted to tokens
+            decoder_attention_mask: attention mask for text tokens
+    """
     def __init__(self, root="IAM_OCR/data", eval=False):
         self.root = root
         meta_filepath=f"{self.root}/gt_test.txt"
@@ -13,7 +23,10 @@ class OCRData:
         self.eval=eval
     
     @staticmethod
-    def get_data(meta_filepath, eval):
+    def get_data(meta_filepath:str, eval:bool) -> pd.DataFrame:
+        """
+        returns pd.DataFrame of metadata: file_path and text
+        """
         with open(meta_filepath, "r") as f:
             x = f.read()
         df = pd.DataFrame([xx.split("\t") for xx in x.splitlines()], columns=['file_path','text'])
@@ -32,7 +45,9 @@ class OCRData:
         row = self.df.loc[idx]
         file_path = f"{self.root}/image/{row['file_path']}"
         img = cv2.imread(file_path)
-        img = torch.tensor(img)
+        img = cv2.resize(img, (1024,128), interpolation=cv2.INTER_CUBIC)
+        img = img / 255
+        img = torch.tensor(img).to(torch.float32)
         label = row['text']
         self.df.loc[idx, ['s0','s1','s2']] = list(img.shape)
         self.df.loc[idx, ['dtype']] = img.dtype
@@ -43,8 +58,6 @@ def collate_fn(x, tokenizer):
     # pad pixel_values to max width
     pixel_values = [xx.pop('pixel_values') for xx in x]
     pixel_values = [img.permute(2,0,1) for img in pixel_values] #h,w,c -> c,h,w
-    w = 4352
-    pixel_values = [F.pad(img, [0, w - img.size(2)]) for img in pixel_values]
     pixel_values = torch.stack(pixel_values)
 
     x = torch.utils.data.default_collate(x)
