@@ -6,16 +6,25 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 class OCRData:
-    def __init__(self, root="../data"):
+    def __init__(self, root="../data", eval=False):
         self.root = root
         meta_filepath=f"{self.root}/gt_test.txt"
-        self.df = self.get_data(meta_filepath)
+        self.df = self.get_data(meta_filepath, eval)
+        self.eval=eval
     
     @staticmethod
-    def get_data(meta_filepath):
+    def get_data(meta_filepath, eval):
         with open(meta_filepath, "r") as f:
             x = f.read()
         df = pd.DataFrame([xx.split("\t") for xx in x.splitlines()], columns=['file_path','text'])
+        #train_records = int(len(df) * 0.8)
+        #eval_records = len(df) - train_records
+        train_records = 10
+        eval_records = 5
+        if eval:
+            df = df.tail(eval_records).reset_index(drop=True)
+        else:
+            df  = df.head(train_records)
         return df
 
     def __len__(self):
