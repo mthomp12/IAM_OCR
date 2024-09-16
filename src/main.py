@@ -53,9 +53,27 @@ class SampleCallback(TrainerCallback):
         tokens = model.generate(**batch)
         labels = batch['labels']
         tokenizer = kwargs['tokenizer']
+        tokens[tokens ==-100] = 1
+        labels[labels ==-100] = 1
         pred = tokenizer.batch_decode(tokens)
         actual = tokenizer.batch_decode(labels)
         delim = "-" * 50
+        print("eval generate:")
+        for p, a in zip(pred, actual):
+            print(f"{delim}\npredicted: {p}\nactual: {a}\n{delim}\n\n")
+
+    def on_epoch_end(self, args, state, control, **kwargs):
+        model = kwargs['model']
+        batch = next(iter(kwargs['train_dataloader']))
+        tokens = model.generate(**batch)
+        labels = batch['labels']
+        tokenizer = kwargs['tokenizer']
+        tokens[tokens ==-100] = 1
+        labels[labels ==-100] = 1
+        pred = tokenizer.batch_decode(tokens)
+        actual = tokenizer.batch_decode(labels)
+        delim = "-" * 50
+        print("training generate:")
         for p, a in zip(pred, actual):
             print(f"{delim}\npredicted: {p}\nactual: {a}\n{delim}\n\n")
 
@@ -72,3 +90,4 @@ trainer = Trainer(
                     )
 
 trainer.train()
+import pdb; pdb.set_trace()

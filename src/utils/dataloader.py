@@ -53,7 +53,7 @@ def collate_fn(x, tokenizer):
     tokens = tokenizer(labels, return_tensors='pt', padding=True, truncation=True)
     x['labels'] = tokens['input_ids']
     x['decoder_attention_mask'] = tokens['attention_mask']
-
+    x['labels'][x['labels']==1] = -100
     return x
 
 if __name__ == '__main__':
