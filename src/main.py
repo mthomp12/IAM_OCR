@@ -7,7 +7,7 @@ from utils.dataloader import OCRData, collate_fn
 
 wandb.init(project="IAM_OCR", entity="mthomp12", name=str(datetime.datetime.now()).partition(".")[0])
 
-config_encoder = ViTConfig(image_size=(128,4352))
+config_encoder = ViTConfig(image_size=(128,1024))
 decoder = AutoModel.from_pretrained("FacebookAi/roberta-base")
 config_decoder = decoder.config
 config = VisionEncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
@@ -30,16 +30,21 @@ model.decoder.load_state_dict(decoder_state_dict)
 
 training_arguments = TrainingArguments(
                                         output_dir="outputs",
-                                        per_device_train_batch_size=1,
+                                        per_device_train_batch_size=16,
                                         per_device_eval_batch_size=5,
                                         logging_steps=10,
                                         bf16=True,
                                         eval_strategy='epoch',
+                                        num_train_epochs = 10,
+                                        save_strategy = 'epoch',
+                                        save_total_limit = 3,
+                                        load_best_model_at_end  = True,
+                                        gradient_accumulation_steps = 1
                                         )
 tokenizer = AutoTokenizer.from_pretrained("FacebookAi/roberta-base")
 collator = functools.partial(collate_fn, tokenizer=tokenizer)
 
-wandb.watch(model, log='all', log_freq=400)
+wandb.watch(model, log='all', log_freq=40)
 
 class SampleCallback(TrainerCallback):
     def on_evaluate(self, args, state, control, **kwargs):
@@ -48,8 +53,8 @@ class SampleCallback(TrainerCallback):
         tokens = model.generate(**batch)
         labels = batch['labels']
         tokenizer = kwargs['tokenizer']
-        pred = tokenizer.batch_decode(tokens, skip_special_tokens=True)
-        actual = tokenizer.batch_decode(labels, skip_special_tokens=True)
+        pred = tokenizer.batch_decode(tokens)
+        actual = tokenizer.batch_decode(labels)
         delim = "-" * 50
         for p, a in zip(pred, actual):
             print(f"{delim}\npredicted: {p}\nactual: {a}\n{delim}\n\n")

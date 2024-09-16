@@ -32,7 +32,9 @@ class OCRData:
         row = self.df.loc[idx]
         file_path = f"{self.root}/image/{row['file_path']}"
         img = cv2.imread(file_path)
-        img = torch.tensor(img)
+        img = cv2.resize(img, (1024,128), interpolation=cv2.INTER_CUBIC)
+        img = img / 255
+        img = torch.tensor(img).to(torch.float32)
         label = row['text']
         self.df.loc[idx, ['s0','s1','s2']] = list(img.shape)
         self.df.loc[idx, ['dtype']] = img.dtype
@@ -43,8 +45,6 @@ def collate_fn(x, tokenizer):
     # pad pixel_values to max width
     pixel_values = [xx.pop('pixel_values') for xx in x]
     pixel_values = [img.permute(2,0,1) for img in pixel_values] #h,w,c -> c,h,w
-    w = 4352
-    pixel_values = [F.pad(img, [0, w - img.size(2)]) for img in pixel_values]
     pixel_values = torch.stack(pixel_values)
 
     x = torch.utils.data.default_collate(x)
