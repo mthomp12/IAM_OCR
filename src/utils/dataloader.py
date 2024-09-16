@@ -6,16 +6,23 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 class OCRData:
-    def __init__(self, root="IAM_OCR/data"):
+    def __init__(self, root="IAM_OCR/data", eval=False):
         self.root = root
         meta_filepath=f"{self.root}/gt_test.txt"
-        self.df = self.get_data(meta_filepath)
+        self.df = self.get_data(meta_filepath, eval)
+        self.eval=eval
     
     @staticmethod
-    def get_data(meta_filepath):
+    def get_data(meta_filepath, eval):
         with open(meta_filepath, "r") as f:
             x = f.read()
         df = pd.DataFrame([xx.split("\t") for xx in x.splitlines()], columns=['file_path','text'])
+        train_records = int(len(df) * 0.8)
+        eval_records = len(df) - train_records
+        if eval:
+            df = df.tail(eval_records).reset_index(drop=True)
+        else:
+            df  = df.head(train_records)
         return df
 
     def __len__(self):
@@ -50,13 +57,14 @@ def collate_fn(x, tokenizer):
     return x
 
 if __name__ == '__main__':
+    import functools
     from torch.utils.data import DataLoader
+    from transformers import AutoTokenizer
     ds = OCRData()
-    dl = DataLoader(ds, batch_size=32, collate_fn=collate_fn)
+    tokenizer = AutoTokenizer.from_pretrained("FacebookAi/roberta-base")
+    collator = functools.partial(collate_fn, tokenizer=tokenizer)
+    dl = DataLoader(ds, batch_size=32, collate_fn=collator)
     for batch in tqdm(dl):
         pass
 
     df = dl.dataset.df
-    print(df[df['err']==1])
-
-

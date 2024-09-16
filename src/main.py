@@ -1,9 +1,6 @@
 import datetime
 import functools
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from transformers import ViTConfig, RobertaConfig, VisionEncoderDecoderConfig, VisionEncoderDecoderModel, ViTModel, Trainer, TrainingArguments, AutoTokenizer, AutoModel
+from transformers import ViTConfig, VisionEncoderDecoderConfig, VisionEncoderDecoderModel, Trainer, TrainingArguments, AutoTokenizer, AutoModel, TrainerCallback
 import wandb
 
 from utils.dataloader import OCRData, collate_fn
@@ -21,7 +18,8 @@ model.config.pad_token_id = 1
 pretrained_state_dict = decoder.state_dict()
 decoder_state_dict = model.decoder.state_dict()
 
-ds = OCRData()
+train_ds = OCRData()
+eval_ds = OCRData(eval=True)
 
 for k,v in pretrained_state_dict.items():
     key = f"roberta.{k}"
@@ -32,21 +30,40 @@ model.decoder.load_state_dict(decoder_state_dict)
 
 training_arguments = TrainingArguments(
                                         output_dir="outputs",
-                                        per_device_train_batch_size=2,
+                                        per_device_train_batch_size=1,
+                                        per_device_eval_batch_size=5,
                                         logging_steps=10,
-                                        bf16=True
+                                        bf16=True,
+                                        eval_strategy='epoch',
                                         )
 tokenizer = AutoTokenizer.from_pretrained("FacebookAi/roberta-base")
 collator = functools.partial(collate_fn, tokenizer=tokenizer)
 
 wandb.watch(model, log='all', log_freq=400)
+
+class SampleCallback(TrainerCallback):
+    def on_evaluate(self, args, state, control, **kwargs):
+        model = kwargs['model']
+        batch = next(iter(kwargs['eval_dataloader']))
+        tokens = model.generate(**batch)
+        labels = batch['labels']
+        tokenizer = kwargs['tokenizer']
+        pred = tokenizer.batch_decode(tokens, skip_special_tokens=True)
+        actual = tokenizer.batch_decode(labels, skip_special_tokens=True)
+        delim = "-" * 50
+        for p, a in zip(pred, actual):
+            print(f"{delim}\npredicted: {p}\nactual: {a}\n{delim}\n\n")
+
+
+sample_callback = [SampleCallback()]
 trainer = Trainer( 
                     model = model, 
                     args = training_arguments,
-                    train_dataset = ds,
+                    train_dataset = train_ds,
+                    eval_dataset= eval_ds,
                     data_collator = collator,
-                    eval_dataset = None,
-                    tokenizer = tokenizer
+                    tokenizer = tokenizer,
+                    callbacks = sample_callback
                     )
 
 trainer.train()
